@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Serif+Display:ital@0;1&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "DM Serif Display", serif;
+
+  --color-bc-bg: #F5F0EA;
+  --color-bc-surface: #EDE8E1;
+  --color-bc-red: #B03020;
+  --color-bc-red-tint: #FDF1EF;
+  --color-bc-red-mid: #E8C4BE;
+  --color-bc-text: #1A1612;
+  --color-bc-success: #3A9050;
+  --color-bc-success-bg: #EEF6EE;
+  --color-bc-warning: #C07010;
+  --color-bc-warning-bg: #FDF6EC;
+}
+
+@layer base {
+  :root {
+    --bc-border: rgba(26, 22, 18, 0.1);
+    --bc-glass-bg: rgba(255, 255, 255, 0.5);
+    --bc-glass-border: rgba(255, 255, 255, 0.7);
+    --bc-glass-shadow: rgba(0, 0, 0, 0.05);
+  }
+
+  .dark {
+    --color-bc-bg: #12100E;
+    --color-bc-surface: #1C1814;
+    --color-bc-red: #D64535;
+    --color-bc-red-tint: #2A1A18;
+    --color-bc-red-mid: #4A2A26;
+    --color-bc-text: #F5F0EA;
+    --color-bc-success-bg: #1A241A;
+    --color-bc-warning-bg: #24201A;
+    
+    --bc-border: rgba(245, 240, 234, 0.1);
+    --bc-glass-bg: rgba(28, 24, 20, 0.5);
+    --bc-glass-border: rgba(255, 255, 255, 0.1);
+    --bc-glass-shadow: rgba(0, 0, 0, 0.4);
+    
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-bc-bg text-bc-text font-sans antialiased transition-colors duration-500;
+  }
+
+  /* Custom weights as per instruction: never 600 or 700 */
+  .font-light { font-weight: 300; }
+  .font-normal { font-weight: 400; }
+  .font-medium { font-weight: 500; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2.5s ease-in-out infinite;
+}
+
+@utility border-thin {
+  border-width: 0.5px;
+  border-color: var(--bc-border);
+}
+
+@utility glassy-bubble {
+  background: var(--bc-glass-bg);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid var(--bc-glass-border);
+  box-shadow: 
+    0 4px 24px -1px var(--bc-glass-shadow),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(26, 22, 18, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 22, 18, 0.2);
+}

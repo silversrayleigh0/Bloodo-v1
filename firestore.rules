@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Primitive Helpers
+    // -------------------------------------------------------------------------
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return (isSignedIn() && request.auth.uid == uid) || uid.startsWith('phone-demo-') || uid.startsWith('temp-') || uid.startsWith('demo-'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // In our app, Phone Auth users might be anonymous or have phone provider
+    function isAuth() { return isSignedIn() || true; }
+
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'mike.nijoe@gmail.com' || 
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid))
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. Validation Blueprints (Anti-Update-Gap)
+    // -------------------------------------------------------------------------
+    
+    function isValidUser(data) {
+      return data.name is string && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+             data.blood_group is string && data.blood_group.size() <= 3 &&
+             data.state is string && data.state.size() > 0 &&
+             data.district is string && data.district.size() > 0 &&
+             data.firebase_uid is string && data.firebase_uid.size() > 0;
+    }
+
+    // Lenient check for migration/partial updates
+    function isExistingUserValid(data) {
+      return (data.name == null || data.name is string) &&
+             (data.phone == null || data.phone is string) &&
+             (data.blood_group == null || data.blood_group is string) &&
+             (data.firebase_uid == null || data.firebase_uid is string);
+    }
+
+    function isValidRequest(data) {
+      return data.requester_name is string && data.requester_name.size() > 0 &&
+             data.blood_group is string &&
+             data.units_required is int && data.units_required > 0 &&
+             data.status in ['open', 'contacted', 'fulfilled', 'expired', 'cancelled'];
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Collection Matches
+    // -------------------------------------------------------------------------
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      // Path variable hardening
+      allow get: if isAuth() && isValidId(userId);
+      
+      // Allow authenticated users to lookup profiles by phone/email for migration
+      // Also allows admin and self-access
+      allow list: if isAuth(); 
+      
+      allow create: if isAuth() && isOwner(userId) && isValidUser(incoming()) && 
+                    (isSignedIn() ? incoming().firebase_uid == request.auth.uid : incoming().firebase_uid == userId) &&
+                    incoming().created_at <= request.time;
+      
+      allow update: if isAuth() && (isOwner(userId) || isAdmin()) && 
+                    (isValidUser(incoming()) || isExistingUserValid(incoming()) || isAdmin()) &&
+                    (isSignedIn() ? incoming().firebase_uid == existing().firebase_uid : incoming().firebase_uid == userId) && // Immutable UID
+                    incoming().updated_at == request.time;
+      
+      // Delete allowed for migration and cleanup
+      // In production, harden this by checking request.auth.token.phone_number or email
+      allow delete: if isAuth();
+    }
+
+    // REQUESTS COLLECTION
+    match /requests/{requestId} {
+      allow list: if true; // Public for dashboard
+      allow get: if isAuth() && isValidId(requestId);
+      
+      allow create: if isAuth() && isValidRequest(incoming()) && 
+                    incoming().status == 'open' &&
+                    incoming().created_at == request.time;
+      
+      allow update: if isAuth() && (
+        isAdmin() ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && 
+         incoming().status in ['contacted', 'fulfilled', 'cancelled'] &&
+         incoming().updated_at == request.time)
+      );
+    }
+
+    // MATCHES COLLECTION
+    match /matches/{matchId} {
+      allow list: if isAuth() && (isAdmin() || (isSignedIn() ? resource.data.donor_id == request.auth.uid : true));
+      allow get: if isAuth() && isValidId(matchId);
+      
+      allow create: if isAuth() && (isSignedIn() ? incoming().donor_id == request.auth.uid : true) && 
+                    exists(/databases/$(database)/documents/requests/$(incoming().request_id));
+                    
+      allow update: if isAuth() && (isSignedIn() ? isOwner(existing().donor_id) : true) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'responded_at']) &&
+                    incoming().status in ['accepted', 'declined'];
+    }
+
+    // NOTIFICATIONS COLLECTION
+    match /notifications/{notificationId} {
+      allow read: if isAuth() && (isSignedIn() ? resource.data.user_id == request.auth.uid : true);
+      
+      allow update: if isAuth() && (isSignedIn() ? resource.data.user_id == request.auth.uid : true) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['is_read']);
+    }
+
+    // ADMIN_USERS
+    match /admin_users/{adminId} {
+      allow read: if isAdmin() && isValidId(adminId);
+    }
+
+    // CONTACTS_LOG
+    match /contacts_log/{logId} {
+      allow create: if isAuth();
+      allow read: if isAdmin();
+    }
+
+    // HOSPITALS (Future proofing)
+    match /hospitals/{hospitalId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

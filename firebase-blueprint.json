@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a donor in the system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "age": { "type": "integer" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "role": { "type": "string", "enum": ["donor", "admin"] },
+        "blood_group": { "type": "string", "enum": ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"] },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "city": { "type": "string" },
+        "is_available": { "type": "boolean" },
+        "snoozed_until": { "type": "string", "format": "date-time" },
+        "last_donated_at": { "type": "string", "format": "date-time" },
+        "total_donations": { "type": "integer" },
+        "search_appearances": { "type": "integer" },
+        "firebase_uid": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "blood_group", "state", "district", "firebase_uid"]
+    },
+    "Hospital": {
+      "title": "Hospital",
+      "description": "Represents a registered hospital.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "city": { "type": "string" },
+        "contact_person": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "is_verified": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Request": {
+      "title": "Blood Request",
+      "description": "A request for blood donation.",
+      "type": "object",
+      "properties": {
+        "requester_name": { "type": "string" },
+        "requester_phone": { "type": "string" },
+        "blood_group": { "type": "string" },
+        "units_required": { "type": "integer" },
+        "required_on": { "type": "string", "format": "date" },
+        "reason": { "type": "string" },
+        "hospital_name": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "city": { "type": "string" },
+        "posted_by": { "type": "string" },
+        "hospital_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "contacted", "fulfilled", "expired", "cancelled"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Match": {
+      "title": "Donor Match",
+      "description": "A connection between a donor and a request.",
+      "type": "object",
+      "properties": {
+        "request_id": { "type": "string" },
+        "donor_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined", "no_response"] },
+        "notified_at": { "type": "string", "format": "date-time" },
+        "responded_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "is_read": { "type": "boolean" },
+        "related_request_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Public and private user profiles."
+    },
+    "/hospitals/{hospitalId}": {
+      "schema": "Hospital",
+      "description": "Hospital records."
+    },
+    "/requests/{requestId}": {
+      "schema": "Request",
+      "description": "Active and past blood requests."
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Donor connections to requests."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notification inbox."
+    }
+  }
+}

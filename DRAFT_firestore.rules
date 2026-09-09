@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitive Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Auth tokens might be anonymous in this environment for Phone Auth demos
+    function isVerified() { 
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'anonymous'); 
+    }
+
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'mike.nijoe@gmail.com' || 
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid))
+      );
+    }
+
+    // --- ENTITY VALIDATIONS ---
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+             data.blood_group is string && data.blood_group.size() <= 3 &&
+             data.state is string && data.state.size() > 0 &&
+             data.district is string && data.district.size() > 0 &&
+             data.firebase_uid is string && data.firebase_uid.size() > 0;
+    }
+
+    function isValidRequest(data) {
+      return data.requester_name is string && data.requester_name.size() > 0 &&
+             data.blood_group is string &&
+             data.units_required is int && data.units_required > 0 &&
+             data.status in ['open', 'contacted', 'fulfilled', 'expired', 'cancelled'];
+    }
+
+    // --- COLLECTION MATCHES ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if true; 
+      
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(incoming());
+      
+      // Allow deletion for account migration if we can prove identity 
+      // Simplified: only owner or admin can delete. 
+      // For migration, we might need a more complex check or handle it in the service differently.
+      allow delete: if isSignedIn() && (isOwner(userId) || isAdmin());
+    }
+
+    match /requests/{requestId} {
+      allow list: if true;
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidRequest(incoming()) && 
+                    incoming().status == 'open' &&
+                    incoming().created_at == request.time;
+      
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status in ['contacted', 'fulfilled', 'cancelled'])
+      );
+    }
+
+    match /matches/{matchId} {
+      allow list: if true;
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && incoming().donor_id == request.auth.uid && 
+                    exists(/databases/$(database)/documents/requests/$(incoming().request_id));
+      allow update: if isSignedIn() && isOwner(existing().donor_id) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'responded_at']) &&
+                    incoming().status in ['accepted', 'declined'];
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && isOwner(resource.data.user_id);
+      allow update: if isSignedIn() && isOwner(resource.data.user_id) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['is_read']);
+    }
+
+    match /admin_users/{adminId} {
+      allow read: if isAdmin();
+    }
+  }
+}
